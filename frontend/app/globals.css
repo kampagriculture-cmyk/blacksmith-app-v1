@@ -1,0 +1,38 @@
+@import "tailwindcss";
+
+:root {
+  --background: #16181d;
+  --foreground: #f2f3f5;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* DESIGN.md — "The Shift Log" canonical palette */
+  --color-graphite-night: #16181d;
+  --color-graphite-surface: #1d1f24;
+  --color-graphite-surface-2: #272a30;
+  --color-hairline: #3a3e46;
+  --color-hairline-strong: #4a4e57;
+  --color-ink: #f2f3f5;
+  --color-ink-muted: #a9adb6;
+  --color-ink-faint: #80848d;
+  --color-shift-blue: #2f6fc4;
+  --color-shift-blue-text: #7fb0e8;
+  --color-amber-warning-bg: #3a3322;
+  --color-amber-warning-border: #6b5a2e;
+  --color-amber-warning-text: #f0c674;
+  --color-alert-rose-bg: #3d2626;
+  --color-alert-rose-text: #e89a9a;
+  --color-confirm-green-bg: #243a2e;
+  --color-confirm-green-text: #7fd1a0;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+}

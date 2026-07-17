@@ -1,0 +1,7 @@
+{
+  "name": "myproductionsystem",
+  "private": true,
+  "scripts": {
+    "deploy": "npx vercel deploy backend --prod --yes && npx vercel deploy frontend --prod --yes"
+  }
+}

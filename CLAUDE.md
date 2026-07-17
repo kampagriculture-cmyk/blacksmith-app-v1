@@ -1,0 +1,89 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+A production-line logging system for a knife-sharpening shop (ลับมีด). Operators check out a machine, start a work order (lot), run tuning rounds / stone changes during the shift, and check out the log with final quantities and defect counts. It's a learning project (comments in `backend/src` are written in Thai by the author to explain NestJS/Prisma/Postgres concepts to themselves) — treat in-code Thai comments as valuable context, not boilerplate to strip.
+
+This is a single git repository at the project root, covering `backend/`, `frontend/`, `database/`, and `ts-practice/` together (previously untracked).
+
+## Structure
+
+```
+MyProductionSystem/
+├── backend/       NestJS + Prisma + PostgreSQL API (port 3001)
+├── frontend/      Next.js App Router UI (port 3002)
+├── database/      Hand-written raw SQL (001_init_schema.sql, 002_seed_data.sql) — the original schema source before Prisma introspection
+├── docker-compose.yml   Local Postgres 16 container
+└── ts-practice/   Unrelated TypeScript sandbox for practicing syntax — not part of the app, ignore unless asked
+```
+
+## Commands
+
+### Database
+The backend points at a Neon-hosted Postgres instance (`backend/.env` `DATABASE_URL`) — no local database needs to be running for normal development. `docker-compose.yml` still exists for an offline/local fallback (`docker-compose up -d`, localhost:5432) but isn't the default anymore.
+
+`database/001_init_schema.sql` and `002_seed_data.sql` are kept in sync with `schema.prisma` and are what was run against Neon to provision it (via `npx prisma db execute --file <path>` from `backend/`, since `psql` isn't required). If you hand-edit the schema, keep the SQL files and `schema.prisma` from drifting apart — a stale `001_init_schema.sql` previously caused a real bug (missing `started_at` column, wrong NOT NULL constraints, missing the `one_in_progress_per_machine` partial unique index) that only surfaced at runtime, not at build time.
+
+### Backend (`backend/`)
+```bash
+npx nest start --watch        # http://localhost:3001 — no npm script alias exists for this, call nest directly
+npx prisma generate           # regenerate client into backend/generated/prisma after schema.prisma changes
+npx prisma db pull            # introspect DB → schema.prisma (this is how the schema has been kept in sync so far)
+```
+There is **no test runner configured** — `npm test` is a stub that exits with an error. "Tests" in this repo are ad hoc scripts run manually against a running dev server:
+- `test-start.ps1`, `test-checkout.ps1`, `test-post.ps1` — PowerShell scripts that POST/PATCH to the API and pretty-print success/error responses. Call with a `-Body @{...}` hashtable.
+- `test-concurrent.js`, `test-concurrent-checkout.js` — Node scripts that fire parallel requests to exercise the machine-lock and row-lock concurrency logic.
+- `test-prisma.ts` — scratch script for Prisma Client, run via `tsx`.
+
+There are **no Prisma migrations** (`backend/prisma/migrations/` does not exist). The schema was built via `database/*.sql` directly against Postgres, then captured into `schema.prisma` with `prisma db pull`. If you need schema changes, either hand-write SQL and re-run `db pull`, or introduce `prisma migrate` deliberately (that's a workflow change, confirm with the user first).
+
+### Frontend (`frontend/`)
+```bash
+npm run dev                   # next dev -p 3002
+npm run build
+npm run lint
+```
+
+### Deployment (Vercel)
+
+Both apps deploy to Vercel as separate Projects from this one repo (Root Directory = `backend` / `frontend` respectively). After one-time setup below, redeploying both is a single command from the repo root:
+
+```bash
+npm run deploy                # vercel deploy backend --prod, then frontend --prod
+```
+
+**One-time setup, in order:**
+1. `vercel login` (interactive, opens a browser).
+2. `npm run deploy` once — with no linked project yet, `vercel deploy --yes` auto-creates and links a new Vercel Project for each of `backend/` and `frontend/`, using the directory name. Note the two assigned `*.vercel.app` URLs it prints.
+3. Set env vars per project (Vercel dashboard → Project → Settings → Environment Variables, or `vercel env add NAME production` from inside that directory):
+   - **backend project**: `DATABASE_URL` (the Neon connection string from `backend/.env`), `CORS_ORIGINS` (comma-separated; must include the frontend's `*.vercel.app` URL from step 2).
+   - **frontend project**: `NEXT_PUBLIC_API_URL` (the backend's `*.vercel.app` URL from step 2).
+4. `npm run deploy` again so both sides pick up the env vars set in step 3.
+
+The backend runs on Vercel as a serverless function, not `app.listen()` — see `backend/api/index.ts` (the Vercel entrypoint, wraps the Nest app with `ExpressAdapter` and caches the bootstrapped app across warm invocations) and `backend/vercel.json` (rewrites every path to that function). `backend/src/bootstrap.ts` holds the ValidationPipe/exception-filter/CORS setup shared between `src/main.ts` (local dev, `app.listen(3001)`) and `api/index.ts` (serverless, `app.init()`) — edit shared request-handling config there, not in either entrypoint. `postinstall`/`vercel-build` both run `prisma generate` since the generated client isn't committed (gitignored) and Vercel's function bundler needs it on disk before bundling `api/index.ts`.
+
+## Architecture
+
+**Domain model** (see `database/001_init_schema.sql` for the clearest annotated view, `backend/prisma/schema.prisma` for the Prisma-generated version — they describe the same schema):
+- `production_logs` is the core table: one row per work order (machine + knife + lot, `status` of `in_progress`/`completed`).
+- Three child tables hang off `production_logs.id` via FK cascade-delete: `stone_changes` (0 or 1 per log), `tune_rounds` (0 or many), `defect_entries` (0–15 per log, one per `defect_types.code`).
+- `good_qty` is never stored — it's derived (`total_qty - SUM(defect_entries.qty)`) via the `production_logs_summary` SQL view.
+- A partial unique index (`one_in_progress_per_machine`, on `production_logs.machine_id` where `status = 'in_progress'`) enforces that a machine can only have one open work order at a time — this is a DB-level constraint, not just app logic.
+
+**Concurrency control** (`backend/src/production-logs/production-logs.service.ts`): starting a work order takes a Postgres advisory lock (`pg_advisory_xact_lock`, namespace `42` + machine id) inside a transaction before checking/creating, to serialize concurrent "start" requests on the same machine ahead of the unique-index check. Checkout takes a row lock (`SELECT ... FOR UPDATE`) on the target `production_logs` row before validating status, so two simultaneous checkouts on the same log can't both succeed. When touching this file, preserve these lock-then-check patterns — removing them reopens race conditions the tests in `test-concurrent*.js` are there to catch.
+
+**Prisma client is non-default**: generated to `backend/generated/prisma` (not `node_modules/@prisma/client`), using the `@prisma/adapter-pg` driver adapter (see `PrismaService`). Import from `../generated/prisma/client`, not `@prisma/client`. Regenerate with `npx prisma generate` after any `schema.prisma` edit.
+
+**Relation naming gotcha**: `production_logs` has two FKs to `employees` (`operator_id`, `supervisor_id`), so Prisma auto-generates disambiguated relation field names like `employees_production_logs_operator_idToemployees`. These names are load-bearing in both `production-logs.service.ts` and `frontend/lib/api.ts` types — don't try to rename them without regenerating and updating both sides.
+
+**Error handling**: two global exception filters registered in `main.ts` — `PrismaExceptionFilter` maps known Prisma error codes (P2002 unique violation → 409, P2003 FK violation → 400, P2025 not found → 404) to Thai-language JSON error bodies; `AllExceptionsFilter` is the catch-all fallback for anything else → 500. Global `ValidationPipe` runs with `whitelist`, `forbidNonWhitelisted`, and `transform` all enabled, so DTOs are the single source of truth for what a request body may contain.
+
+**Frontend/backend contract**: `frontend/lib/api.ts` is a hand-maintained typed fetch wrapper — there's no codegen from the backend DTOs, so when a backend DTO shape changes, update the matching type in `lib/api.ts` by hand. CORS in `main.ts` is locked to `http://localhost:3002` (the frontend dev port) plus `GET/POST/PATCH/DELETE/OPTIONS`.
+
+**Route ordering**: in `production-logs.controller.ts`, static routes must be declared before parameterized ones on the same path prefix (e.g. `start` before `:id/checkout`) or Nest will try to match the param route first. Keep this ordering in mind when adding new endpoints under `production-logs`.
+
+## Design Context
+
+`PRODUCT.md` and `DESIGN.md` at the project root capture the frontend's strategic and visual design system (via the `impeccable` skill under `.claude/skills/impeccable`). Read both before making UI changes to `frontend/`: PRODUCT.md covers register/users/purpose/principles, DESIGN.md is the canonical token/component spec ("The Shift Log" — graphite surfaces, Shift Blue accent, confirm/warn/alert status tiers). Note that `start/page.tsx` and `dashboard/page.tsx` still use the older Tailwind neutral/emerald theme and haven't been migrated onto the DESIGN.md palette yet — `checkout/page.tsx` is the closest to canonical.

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-07-17T15:29:25Z",
+  "title": "Design System: The Shift Log",
+  "extensions": {
+    "colorMeta": {
+      "shift-blue": {
+        "role": "primary",
+        "displayName": "Shift Blue",
+        "canonical": "#2f6fc4",
+        "tonalRamp": ["#0d1b2e", "#14304f", "#1a4570", "#2f6fc4", "#5990d6", "#7fb0e8", "#a8c9ef", "#dbe8f8"]
+      },
+      "confirm-green": {
+        "role": "secondary",
+        "displayName": "Confirm Green",
+        "canonical": "#7fd1a0",
+        "tonalRamp": ["#243a2e", "#3d6b52", "#5a9b78", "#7fd1a0"]
+      },
+      "amber-warning-text": {
+        "role": "secondary",
+        "displayName": "Amber Warning",
+        "canonical": "#f0c674",
+        "tonalRamp": ["#3a3322", "#6b5a2e", "#a98a4a", "#c9a85a", "#f0c674"]
+      },
+      "amber-warning-hint": {
+        "role": "secondary",
+        "displayName": "Amber Warning Hint",
+        "canonical": "#c9a85a"
+      },
+      "on-accent": {
+        "role": "primary",
+        "displayName": "On Accent",
+        "canonical": "#ffffff"
+      },
+      "alert-rose-text": {
+        "role": "secondary",
+        "displayName": "Alert Rose",
+        "canonical": "#e89a9a",
+        "tonalRamp": ["#3d2626", "#6b3f3f", "#a86868", "#e89a9a"]
+      },
+      "graphite-night": {
+        "role": "neutral",
+        "displayName": "Graphite Night",
+        "canonical": "#16181d",
+        "tonalRamp": ["#16181d", "#1d1f24", "#272a30", "#3a3e46", "#4a4e57", "#80848d", "#a9adb6", "#f2f3f5"]
+      }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Title", "purpose": "Screen and section headers only." },
+      "body": { "displayName": "Body", "purpose": "Field values, list content, button labels." },
+      "label": { "displayName": "Label", "purpose": "Field labels and secondary metadata, set in Ink Muted." }
+    },
+    "shadows": [],
+    "breakpoints": []
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Full-width solid action button, 56px height, used for the single primary action on a screen.",
+      "html": "<button class=\"ds-btn-primary\">บันทึกข้อมูลเข้าสู่ระบบ</button>",
+      "css": ".ds-btn-primary { width: 100%; height: 56px; border-radius: 12px; border: none; background: #2f6fc4; color: #ffffff; font-size: 17px; font-weight: 500; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; cursor: pointer; transition: background 0.15s ease-out; } .ds-btn-primary:hover { background: #3a7bd6; } .ds-btn-primary:focus-visible { outline: 2px solid #7fb0e8; outline-offset: 2px; } .ds-btn-primary:disabled { background: #272a30; color: #80848d; cursor: not-allowed; }"
+    },
+    {
+      "name": "Toggle Choice Button",
+      "kind": "button",
+      "refersTo": "button-toggle",
+      "description": "Binary on/off selector (machine picker, QC pass/fail) — full fill swap on active state, no partial hover tint.",
+      "html": "<div style=\"display:flex; gap:8px;\"><button class=\"ds-btn-toggle ds-btn-toggle--on\">SG-01</button><button class=\"ds-btn-toggle\">SG-02</button></div>",
+      "css": ".ds-btn-toggle { flex: 1; height: 48px; border-radius: 8px; font-size: 15px; font-weight: 500; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; border: 0.5px solid #4a4e57; background: #272a30; color: #f2f3f5; cursor: pointer; transition: background 0.15s ease-out, border-color 0.15s ease-out; } .ds-btn-toggle--on { background: #2f6fc4; border-color: #2f6fc4; color: #ffffff; } .ds-btn-toggle:focus-visible { outline: 2px solid #7fb0e8; outline-offset: 2px; }"
+    },
+    {
+      "name": "Field Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard text/number field — recessed one tone below its card, 48px height to avoid mobile auto-zoom.",
+      "html": "<div><label class=\"ds-field-label\">เลขล็อต (lot no.)</label><input class=\"ds-field-input\" placeholder=\"เช่น LOT-20260717-01\" /></div>",
+      "css": ".ds-field-label { display: block; font-size: 12px; color: #a9adb6; margin-bottom: 5px; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; } .ds-field-input { width: 100%; height: 48px; padding: 0 12px; border-radius: 8px; border: 0.5px solid #4a4e57; background: #16181d; color: #f2f3f5; font-size: 16px; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; } .ds-field-input:focus-visible { outline: 2px solid #7fb0e8; outline-offset: 1px; } .ds-field-input[readonly] { background: #272a30; color: #a9adb6; }"
+    },
+    {
+      "name": "Card / Section",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "The primary content grouping surface — flat, tonal, hairline-bordered.",
+      "html": "<div class=\"ds-card\"><div class=\"ds-card-head\">ข้อมูลทั่วไป</div><div class=\"ds-card-body\">เนื้อหาภายในการ์ด</div></div>",
+      "css": ".ds-card { background: #1d1f24; border: 0.5px solid #3a3e46; border-radius: 14px; padding: 14px; } .ds-card-head { font-size: 15px; font-weight: 500; color: #f2f3f5; margin-bottom: 12px; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; } .ds-card-body { font-size: 15px; color: #a9adb6; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }"
+    },
+    {
+      "name": "Status Box",
+      "kind": "custom",
+      "refersTo": "status-box",
+      "description": "Full-width tinted banner for confirm/warn/alert feedback — the signature component of the system, entirely background-tinted so it reads peripherally.",
+      "html": "<div class=\"ds-status ds-status--warn\">⚠ พักเครื่อง 2 ชม. 15 นาที — เกิน 2 ชม. ตรวจสอบอีกครั้ง</div>",
+      "css": ".ds-status { margin-top: 11px; padding: 11px 12px; border-radius: 8px; text-align: center; font-size: 15px; font-weight: 500; font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; } .ds-status--confirm { background: #243a2e; color: #7fd1a0; } .ds-status--warn { background: #3a3322; color: #f0c674; } .ds-status--alert { background: #3d2626; color: #e89a9a; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Shift Log",
+    "overview": "This is a logbook, not a storefront. Every screen exists to get one shift's production data recorded correctly, fast, on a shared device that's been tapped with dirty hands since 6am. Nothing here is decorative — the graphite surfaces, the hairline borders, the three-tier status system all exist to answer one question at a glance: did this save, and is anything wrong. The system rejects the two easy failure modes for a tool like this: looking like an abandoned spreadsheet with form fields bolted on, and looking like a consumer app performing friendliness it doesn't need. It is quiet by default and only raises its voice — amber, then rose — when something genuinely needs a second look. Density is generous, not tight: full-width 48–56px touch targets, one clear field per row on narrow layouts, because the cost of a mistap on the floor is a wrong production number, not a mild annoyance.",
+    "keyCharacteristics": [
+      "Near-black graphite base with two tonal surface steps, never a pure black or pure white",
+      "Single accent hue (Shift Blue) reserved for primary actions and active/selected state",
+      "Three explicit status tiers — confirm, warning, alert — used consistently everywhere",
+      "Flat throughout: no shadows, gradients, or glassmorphism; depth via tone-stepping and 0.5px hairlines only",
+      "One typeface, one weight scale, no display-size heroics"
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Shift Blue is the only color that means \"act on this.\" It never appears as decoration — only on the primary button, the active toggle, and the current selection.", "section": "colors" },
+      { "name": "The Earned Amber Rule", "body": "Amber Warning appears only for a real anomaly the operator should double-check. It is never used as a generic \"heads up\" or an empty-state color.", "section": "colors" },
+      { "name": "The One Face Rule", "body": "Geist Sans, everywhere, no exceptions. The checkout screen's Segoe UI override is a defect to fix, not a second typeface to keep.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Every border in the system is 0.5px. Never thicker, never a colored accent stripe. If a boundary needs more emphasis, that's a background-tone problem, not a border-weight problem.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do reserve Shift Blue strictly for primary actions and current selection",
+      "Do use the three-tier confirm/warn/alert system for every status message across the whole app",
+      "Do keep every tappable control at ≥48px height",
+      "Do carry Geist Sans everywhere; retire the Segoe UI override in checkout",
+      "Do make read-only fields visually distinct (Graphite Surface 2) rather than identical to editable ones"
+    ],
+    "donts": [
+      "Don't let this read as a digitized paper form or a spreadsheet with a UI bolted on",
+      "Don't add box-shadow, glassmorphism, or gradients anywhere",
+      "Don't use a colored border-left/border-right stripe as a decorative accent",
+      "Don't spend Amber Warning on anything that isn't a genuine anomaly",
+      "Don't introduce a second typeface, a second border weight, or a one-off shadow"
+    ]
+  }
+}
