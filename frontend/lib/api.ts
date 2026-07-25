@@ -79,6 +79,16 @@ export type TuneRoundPayload = {
   endTime: string;   // "HH:MM"
 };
 
+export type LotCheckResult = {
+  done: boolean;
+  log: {
+    id: number;
+    status: "completed" | "in_progress";
+    ended_at: string | null;
+    machines?: { code: string };
+  } | null;
+};
+
 export type CheckoutPayload = {
   totalQty: number;
   supervisorId: number;
@@ -88,6 +98,50 @@ export type CheckoutPayload = {
   defects?: DefectEntry[];
   stoneChange?: StoneChangePayload;
   tuneRounds?: TuneRoundPayload[];
+};
+
+// ---------- Inventory (เบิก-รับเข้าวัสดุ) ----------
+
+export type InventoryItem = {
+  id: string;
+  name: string;
+  unit: string;
+  reorderPoint: number;
+};
+
+export type InventoryConfig = {
+  employees: { id: number; name: string; role: string }[];
+  machines: { id: number; code: string }[];
+};
+
+export type StockStatus = {
+  id: string;
+  name: string;
+  unit: string;
+  totalIn: number;
+  totalOut: number;
+  balance: number;
+  reorderPoint: number;
+  status: "ปกติ" | "ใกล้หมด" | "สั่งซื้อด่วน";
+  lastUpdated: string | null;
+};
+
+export type WithdrawalPayload = {
+  itemId: string;
+  qty: number;
+  withdrawerId: number;
+  machineId?: number;
+  condition?: string;
+  reason?: string;
+  remark?: string;
+};
+
+export type ReceiptPayload = {
+  itemId: string;
+  qty: number;
+  receiverId: number;
+  source?: string;
+  remark?: string;
 };
 
 // ---------- Endpoints ----------
@@ -103,6 +157,28 @@ export const api = {
   checkout: (id: number, body: CheckoutPayload) =>
     request<InProgressLog>(`/production-logs/${id}/checkout`, {
       method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  checkLot: (lotNo: string) =>
+    request<LotCheckResult>(`/production-logs/lot-check?lotNo=${encodeURIComponent(lotNo)}`),
+
+  // ----- inventory -----
+  getItems: () => request<InventoryItem[]>("/inventory/items"),
+
+  getInventoryConfig: () => request<InventoryConfig>("/inventory/config"),
+
+  getStock: () => request<StockStatus[]>("/inventory/stock"),
+
+  createWithdrawal: (body: WithdrawalPayload) =>
+    request<{ id: number }>("/inventory/withdrawals", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  createReceipt: (body: ReceiptPayload) =>
+    request<{ id: number }>("/inventory/receipts", {
+      method: "POST",
       body: JSON.stringify(body),
     }),
 };

@@ -45,6 +45,20 @@ export class ProductionLogsService {
         );
       }
 
+      // ★ กันล็อตซ้ำ 2 แบบ: เสร็จไปแล้ว หรือกำลังทำอยู่ที่เครื่องอื่น (เครื่องเดียวกันถูกกันไปแล้วด้านบน)
+      const conflictingLot = await tx.production_logs.findFirst({
+        where: { lot_no: dto.lotNo, status: { in: ["completed", "in_progress"] } },
+        select: { id: true, status: true, machines: { select: { code: true } } },
+      });
+
+      if (conflictingLot) {
+        const message =
+          conflictingLot.status === "completed"
+            ? `ล็อตนี้ (${dto.lotNo}) เสร็จงานไปแล้ว (log id ${conflictingLot.id}) — ตรวจสอบเลขล็อตอีกครั้ง`
+            : `ล็อตนี้ (${dto.lotNo}) กำลังทำอยู่ที่เครื่อง ${conflictingLot.machines.code} (log id ${conflictingLot.id}) — ตรวจสอบเลขล็อตอีกครั้ง`;
+        throw new ConflictException(message);
+      }
+
       const log = await tx.production_logs.create({
         data: {
           machine_id: dto.machineId,
@@ -141,6 +155,21 @@ export class ProductionLogsService {
 
       return log;
     });
+  }
+
+  async checkLot(lotNo: string) {
+    const log = await this.prisma.production_logs.findFirst({
+      where: { lot_no: lotNo, status: { in: ["completed", "in_progress"] } },
+      select: {
+        id: true,
+        status: true,
+        ended_at: true,
+        machines: { select: { code: true } },
+      },
+      orderBy: { created_at: "desc" },
+    });
+
+    return { done: log !== null, log };
   }
 
   async findInProgress() {

@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { useEffect, useState } from "react";
+import { api, ApiError, type LotCheckResult } from "@/lib/api";
 import { EMPLOYEES } from "@/lib/employees";
 import { BackLink } from "@/components/BackLink";
 
@@ -23,9 +23,38 @@ export default function StartPage() {
   const [lotNo, setLotNo] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [lotCheck, setLotCheck] = useState<"idle" | "checking" | "done" | "ok">("idle");
+  const [conflictingLog, setConflictingLog] = useState<LotCheckResult["log"]>(null);
+
+  // ★ เช็คเลขล็อตซ้ำแบบ live — รอ 500ms หลังพิมพ์เสร็จค่อยถาม backend
+  // (backend เองก็เช็คซ้ำตอน submit อยู่แล้ว อันนี้แค่ให้เห็นก่อนกดปุ่ม)
+  useEffect(() => {
+    const trimmed = lotNo.trim();
+    if (!trimmed) {
+      setLotCheck("idle");
+      setConflictingLog(null);
+      return;
+    }
+    setLotCheck("checking");
+    const t = setTimeout(async () => {
+      try {
+        const result = await api.checkLot(trimmed);
+        setLotCheck(result.done ? "done" : "ok");
+        setConflictingLog(result.log);
+      } catch {
+        setLotCheck("idle"); // เช็ค live ล้มเหลว — ปล่อยผ่าน ให้ backend กันตอน submit แทน
+        setConflictingLog(null);
+      }
+    }, 500);
+    return () => clearTimeout(t);
+  }, [lotNo]);
 
   const ready =
-    machineId !== "" && knifeId !== "" && operatorId !== "" && lotNo.trim() !== "";
+    machineId !== "" &&
+    knifeId !== "" &&
+    operatorId !== "" &&
+    lotNo.trim() !== "" &&
+    lotCheck !== "done";
 
   async function submit() {
     if (!ready || busy) return;
@@ -43,6 +72,8 @@ export default function StartPage() {
       setMsg({ kind: "ok", text: `เปิดงานสำเร็จ — log id ${log.id} / lot ${log.lot_no}` });
       setLotNo("");
       setKnifeId("");
+      setLotCheck("idle");
+      setConflictingLog(null);
     } catch (e) {
       const err = e as ApiError;
       setMsg({
@@ -97,8 +128,20 @@ export default function StartPage() {
             value={lotNo}
             onChange={(ev) => setLotNo(ev.target.value)}
             placeholder="เช่น LOT-20260717-01"
-            className="w-full h-14 rounded-lg bg-graphite-night border-[0.5px] border-hairline-strong px-4 text-lg text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-shift-blue-text"
+            className={`w-full h-14 rounded-lg bg-graphite-night border-[0.5px] px-4 text-lg text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-shift-blue-text ${
+              lotCheck === "done" ? "border-alert-rose-text" : "border-hairline-strong"
+            }`}
           />
+          {lotCheck === "checking" && (
+            <div className="text-sm text-ink-faint mt-2">กำลังตรวจสอบ...</div>
+          )}
+          {lotCheck === "done" && (
+            <div className="rounded-xl p-3 text-sm mt-2 bg-alert-rose-bg text-alert-rose-text border-[0.5px] border-alert-rose-text/40">
+              {conflictingLog?.status === "in_progress"
+                ? `ล็อตนี้ (${lotNo.trim()}) กำลังทำอยู่ที่เครื่อง ${conflictingLog.machines?.code ?? "?"} — ตรวจสอบเลขล็อตอีกครั้ง`
+                : `ล็อตนี้ (${lotNo.trim()}) เสร็จงานไปแล้ว — ตรวจสอบเลขล็อตอีกครั้ง`}
+            </div>
+          )}
         </Field>
 
         <button

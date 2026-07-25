@@ -36,6 +36,8 @@ model employees {
   machine_owners                                           machine_owners[]
   production_logs_production_logs_operator_idToemployees   production_logs[] @relation("production_logs_operator_idToemployees")
   production_logs_production_logs_supervisor_idToemployees production_logs[] @relation("production_logs_supervisor_idToemployees")
+  withdrawal_log                                           withdrawal_log[]
+  receipt_log                                              receipt_log[]
 }
 
 model knives {
@@ -56,6 +58,7 @@ model machines {
   code            String           @unique @db.VarChar(20)
   machine_owners  machine_owners?
   production_logs production_logs?
+  withdrawal_log  withdrawal_log[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -109,4 +112,47 @@ model tune_rounds {
   production_logs   production_logs @relation(fields: [production_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 
   @@unique([production_log_id, round_no])
+}
+
+// ===== Inventory phase (เบิก-รับเข้าวัสดุสิ้นเปลือง) =====
+// สต็อคคำนวณสดผ่าน view `inventory_state` — ไม่มี model ที่นี่ (query ด้วย $queryRaw)
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model item_master {
+  id             String           @id @db.VarChar(30)
+  name           String           @db.VarChar(120)
+  unit           String           @db.VarChar(20)
+  reorder_point  Int
+  active         Boolean          @default(true)
+  withdrawal_log withdrawal_log[]
+  receipt_log    receipt_log[]
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model withdrawal_log {
+  id            Int         @id @default(autoincrement())
+  created_at    DateTime    @default(now()) @db.Timestamp(6)
+  item_id       String      @db.VarChar(30)
+  qty           Int
+  withdrawer_id Int
+  machine_id    Int?
+  condition     String?     @db.VarChar(60)
+  reason        String?
+  remark        String?
+  item_master   item_master @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees     employees   @relation(fields: [withdrawer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  machines      machines?   @relation(fields: [machine_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model receipt_log {
+  id          Int         @id @default(autoincrement())
+  created_at  DateTime    @default(now()) @db.Timestamp(6)
+  item_id     String      @db.VarChar(30)
+  qty         Int
+  receiver_id Int
+  source      String?     @db.VarChar(120)
+  remark      String?
+  item_master item_master @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees   employees   @relation(fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }

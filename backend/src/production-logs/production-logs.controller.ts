@@ -29,6 +29,11 @@ export class ProductionLogsController {
     return this.service.findInProgress();
   }
 
+  @Get("lot-check")
+  checkLot(@Query("lotNo") lotNo: string) {
+    return this.service.checkLot(lotNo);
+  }
+
   @Post()
   create(@Body() dto: CreateProductionLogDto) {
     return this.service.create(dto);

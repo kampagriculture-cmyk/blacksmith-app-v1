@@ -4,6 +4,7 @@ const LINKS = [
   { href: "/start", label: "เปิดงาน", desc: "เริ่มงานใหม่บนเครื่องจักร" },
   { href: "/checkout", label: "ปิดงาน", desc: "บันทึกผลงานและปิดงานที่ค้างอยู่" },
   { href: "/dashboard", label: "แดชบอร์ด", desc: "ดูงานที่กำลังดำเนินอยู่" },
+  { href: "/inventory", label: "เบิก-รับเข้าวัสดุ", desc: "เบิก/รับเข้าวัสดุสิ้นเปลืองและดูสต็อค" },
 ];
 
 export default function Home() {
