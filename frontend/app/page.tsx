@@ -5,6 +5,7 @@ const LINKS = [
   { href: "/checkout", label: "ปิดงาน", desc: "บันทึกผลงานและปิดงานที่ค้างอยู่" },
   { href: "/dashboard", label: "แดชบอร์ด", desc: "ดูงานที่กำลังดำเนินอยู่" },
   { href: "/inventory", label: "เบิก-รับเข้าวัสดุ", desc: "เบิก/รับเข้าวัสดุสิ้นเปลืองและดูสต็อค" },
+  { href: "/analytics", label: "วิเคราะห์ผลการผลิต", desc: "แนวโน้ม ของเสีย อายุหิน เปรียบเทียบ A/B" },
 ];
 
 export default function Home() {

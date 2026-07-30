@@ -1,22 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiError, type LotCheckResult } from "@/lib/api";
-import { EMPLOYEES } from "@/lib/employees";
+import { api, ApiError, type LotCheckResult, type ProductionLogConfig } from "@/lib/api";
 import { BackLink } from "@/components/BackLink";
 
-const MACHINES = [
-  { id: 1, label: "SG-01" },
-  { id: 2, label: "SG-02" },
-];
-
-const KNIVES = [
-  { id: 1, label: "474" },
-  { id: 2, label: "830" },
-  { id: 3, label: "146" },
-];
-
 export default function StartPage() {
+  const [config, setConfig] = useState<ProductionLogConfig | null>(null);
+  const [configErr, setConfigErr] = useState<string | null>(null);
   const [machineId, setMachineId] = useState<number | "">("");
   const [knifeId, setKnifeId] = useState<number | "">("");
   const [operatorId, setOperatorId] = useState<number | "">("");
@@ -25,6 +15,14 @@ export default function StartPage() {
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [lotCheck, setLotCheck] = useState<"idle" | "checking" | "done" | "ok">("idle");
   const [conflictingLog, setConflictingLog] = useState<LotCheckResult["log"]>(null);
+
+  // ★ ดึงรายชื่อเครื่อง/มีด/พนักงานสดจาก backend แทนของ hardcode เดิม
+  useEffect(() => {
+    api
+      .getProductionLogConfig()
+      .then(setConfig)
+      .catch((e) => setConfigErr((e as ApiError).message));
+  }, []);
 
   // ★ เช็คเลขล็อตซ้ำแบบ live — รอ 500ms หลังพิมพ์เสร็จค่อยถาม backend
   // (backend เองก็เช็คซ้ำตอน submit อยู่แล้ว อันนี้แค่ให้เห็นก่อนกดปุ่ม)
@@ -85,6 +83,28 @@ export default function StartPage() {
     }
   }
 
+  if (configErr) {
+    return (
+      <main className="min-h-screen bg-graphite-night text-ink p-4">
+        <BackLink />
+        <h1 className="text-2xl font-bold mb-6">เปิดงาน</h1>
+        <div className="rounded-xl p-4 text-base max-w-md bg-alert-rose-bg text-alert-rose-text border-[0.5px] border-alert-rose-text/40">
+          {configErr}
+        </div>
+      </main>
+    );
+  }
+
+  if (!config) {
+    return (
+      <main className="min-h-screen bg-graphite-night text-ink p-4">
+        <BackLink />
+        <h1 className="text-2xl font-bold mb-6">เปิดงาน</h1>
+        <div className="text-ink-faint">กำลังโหลด...</div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-graphite-night text-ink p-4">
       <BackLink />
@@ -93,9 +113,9 @@ export default function StartPage() {
       <div className="space-y-5 max-w-md">
         <Field label="เครื่อง">
           <div className="grid grid-cols-2 gap-3">
-            {MACHINES.map((m) => (
+            {config.machines.map((m) => (
               <Choice key={m.id} active={machineId === m.id} onClick={() => setMachineId(m.id)}>
-                {m.label}
+                {m.code}
               </Choice>
             ))}
           </div>
@@ -103,9 +123,9 @@ export default function StartPage() {
 
         <Field label="มีด">
           <div className="grid grid-cols-3 gap-3">
-            {KNIVES.map((k) => (
+            {config.knives.map((k) => (
               <Choice key={k.id} active={knifeId === k.id} onClick={() => setKnifeId(k.id)}>
-                {k.label}
+                {k.code}
               </Choice>
             ))}
           </div>
@@ -113,9 +133,9 @@ export default function StartPage() {
 
         <Field label="พนักงาน">
           <div className="grid grid-cols-2 gap-3">
-            {EMPLOYEES.map((e) => (
+            {config.employees.map((e) => (
               <Choice key={e.id} active={operatorId === e.id} onClick={() => setOperatorId(e.id)}>
-                {e.label}
+                {e.name}
               </Choice>
             ))}
           </div>

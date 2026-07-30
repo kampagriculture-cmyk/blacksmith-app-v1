@@ -34,6 +34,21 @@ export class ProductionLogsController {
     return this.service.checkLot(lotNo);
   }
 
+  @Get("config")
+  getConfig() {
+    return this.service.getConfig();
+  }
+
+  @Get("analytics")
+  getAnalyticsData() {
+    return this.service.getAnalyticsData();
+  }
+
+  @Get("machine-owners")
+  getMachineOwners() {
+    return this.service.getMachineOwners();
+  }
+
   @Post()
   create(@Body() dto: CreateProductionLogDto) {
     return this.service.create(dto);

@@ -79,6 +79,34 @@ export type TuneRoundPayload = {
   endTime: string;   // "HH:MM"
 };
 
+export type ProductionLogConfig = {
+  employees: { id: number; name: string; role: string }[];
+  machines: { id: number; code: string }[];
+  knives: { id: number; code: string }[];
+  defectTypes: { code: string; name_th: string; display_order: number }[];
+};
+
+export type AnalyticsRow = {
+  id: number;
+  machineCode: string;
+  knifeCode: string;
+  lotNo: string;
+  endedAt: string | null;
+  totalQty: number;
+  ngQty: number;
+  goodQty: number;
+  defects: Record<string, number>;
+  stoneChanged: boolean;
+  qtyBeforeChange: number | null;
+  stoneDowntimeStart: string | null;
+  stoneDowntimeEnd: string | null;
+  tuneMinutesTotal: number;
+  operatorName: string;
+  supervisorName: string | null;
+};
+
+export type MachineOwners = Record<string, string>;
+
 export type LotCheckResult = {
   done: boolean;
   log: {
@@ -162,6 +190,12 @@ export const api = {
 
   checkLot: (lotNo: string) =>
     request<LotCheckResult>(`/production-logs/lot-check?lotNo=${encodeURIComponent(lotNo)}`),
+
+  getProductionLogConfig: () => request<ProductionLogConfig>("/production-logs/config"),
+
+  getAnalyticsData: () => request<AnalyticsRow[]>("/production-logs/analytics"),
+
+  getMachineOwners: () => request<MachineOwners>("/production-logs/machine-owners"),
 
   // ----- inventory -----
   getItems: () => request<InventoryItem[]>("/inventory/items"),

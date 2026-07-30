@@ -3,31 +3,39 @@
 > Paste this file (or say "read HANDOFF.md") at the start of a new AI session.
 > Works with **Claude Code** (also auto-reads `CLAUDE.md`) and **Gemini CLI**
 > (auto-reads `GEMINI.md` if present — this file is the manual handoff for both).
-> Last updated: 2026-07-18.
+> Last updated: 2026-07-30.
 
 ---
 
-## ⚠️ READ THIS FIRST — repo is behind production
+## ⚠️ READ THIS FIRST — a lot is uncommitted, and Neon now has real historical data
 
-There are **9 uncommitted local changes**, and **GitHub only has the initial commit**.
-The lot-duplicate-check feature is **live on Vercel** (deployed from local via CLI) but
-**not yet on GitHub**. So GitHub `main` is *behind* what's actually deployed.
-
-**First action when back:** commit + push the local changes so GitHub matches production.
-```bash
-cd /c/Dev/MyProductionSystem
-git status              # confirm the 9 changes below
-git add -A
-git commit -m "Add lot-duplicate check, Vercel env examples, docs"
-git push
+**Nothing from the 2026-07-30 session is committed yet.** `git status` currently shows:
 ```
-Uncommitted changes are: `lot-check` feature (backend service/controller + frontend
-`start/page.tsx` + `lib/api.ts`), `.env.example` files, `frontend/.gitignore`,
-`CLAUDE.md`, `.claude/settings.json`.
+M  .claude/settings.json, CLAUDE.md, backend/prisma/schema.prisma,
+   backend/src/production-logs/production-logs.{controller,service}.ts,
+   database/001_init_schema.sql, frontend/app/{checkout,start}/page.tsx,
+   frontend/lib/api.ts
+D  frontend/lib/defect-types.ts, frontend/lib/employees.ts
+?? CONCURRENCY.md, MANAGER_GUIDE.md, backend/scripts/, database/004_reset_reference_data.sql,
+   database/source-data/
+```
+This is all one coherent piece of work (see "What was done" below) — commit it as such
+when the manager (repo owner) is ready; don't split it up without checking with them
+first, they've been deliberately hands-on with review this session.
 
-**Trap:** the Vercel projects were first created via Git integration (dashboard import),
-so a future GitHub push *could* trigger an auto-deploy that **reverts the lot-check feature**
-if GitHub is still behind. Push first, then verify production still works.
+**More important than the git state: production Neon now holds real historical data.**
+691+ real production-log rows were migrated from the shop's old Google Sheets
+("PD-CS-SG-01 REV.001" / "PD-CS-SG-02 REV.001") via `backend/scripts/migrate-gsheet-history.ts`,
+and `employees`/`machines`/`knives` were fully reset (`TRUNCATE ... RESTART IDENTITY CASCADE`)
+and rebuilt around that migration. **Do not treat this DB as disposable seed data anymore** —
+the old assumption ("just re-run 002_seed_data.sql if something looks wrong") no longer
+holds; that file's employee list (includes รัตนา, doesn't include the `active` column) is
+now stale relative to what's actually in Neon. See "Key gotchas" below before touching
+reference-table rows.
+
+**The manager (repo owner) has explicitly asked to drive DB-writing commands themselves**
+going forward — prepare/verify (dry-runs, SELECT checks), hand them the exact command, let
+them run it. This came up hard mid-session; don't relearn it the hard way.
 
 ---
 
@@ -59,6 +67,70 @@ Stack: **NestJS + Prisma** backend, **Next.js (App Router)** frontend, **Neon Po
 
 ---
 
+## What was done this session (2026-07-30)
+
+1. **`CONCURRENCY.md` added** — full walkthrough of the advisory-lock/row-lock
+   patterns in `production-logs.service.ts` (companion to the summary in `CLAUDE.md`),
+   including how to run the `test-concurrent*.js` negative control.
+2. **`MANAGER_GUIDE.md` added** (then substantially rewritten mid-session, see #5) —
+   non-engineer runbook for adding operators/machines/knives/defect-types/materials.
+3. **Migrated real production history from the shop's old Google Sheets into Neon.**
+   - Source: "PD-CS-SG-01 REV.001" (691→696→ final row count, kept growing as the
+     shop kept using the sheet live during migration) and "PD-CS-SG-02 REV.001"
+     (inventory: 7 withdrawals, 1 receipt, 2 materials).
+   - Built `backend/scripts/migrate-gsheet-history.ts` — idempotent, defaults to
+     dry-run, `--commit` to write. Reads `database/source-data/sg01_production_log.csv`
+     (committed for provenance) — no live Google API calls from the script itself, the
+     CSV was pulled once per re-sync via this session's Drive tool access.
+   - Along the way: normalized several operator name variants that had accumulated in
+     the sheet (`ส้ม`→`สุชาดา`, `...(เต้)`→`เต้`, etc. — see `NAME_ALIASES` in the
+     script), caught and fixed 19 rows where a mid-migration correction
+     (`ปิยะดา`→`ปรียะดา`) landed in the sheet *after* an initial `--commit` had already
+     run — the script's dedup key (machine+lot+ended_at) doesn't cover operator
+     identity, so a second run silently skipped them; fixed directly via
+     `backend/scripts/fix-operator-attribution.ts` (kept as an incident record, not
+     meant to be re-run).
+4. **Full DB reset + clean re-migration**, done by the repo owner directly (not by
+   Claude — see the standing rule about DB-writing commands): `TRUNCATE ... RESTART
+   IDENTITY CASCADE` on every table, reseed via `database/004_reset_reference_data.sql`,
+   then `migrate-gsheet-history.ts --commit`. Employee รัตนา was intentionally *not*
+   in this reseed's original-5 (she resigned; ภาวิณี took her `002_seed_data.sql`-era
+   slot) — she still exists as an employee (auto-created from her historical rows) so
+   old logs display correctly, just isn't part of the pre-seed anymore.
+   **`database/002_seed_data.sql` is now stale relative to `004_reset_reference_data.sql`**
+   (different employee list, no `active` column) — don't use 002 as a reset reference
+   without checking 004 first.
+5. **Removed the frontend-hardcoded reference-data problem entirely.** `start/page.tsx`
+   and `checkout/page.tsx` used to import fixed arrays (`frontend/lib/employees.ts`,
+   a `MACHINES`/`KNIVES` const, `frontend/lib/defect-types.ts`) that had to be
+   hand-edited + redeployed every time a row was added in the DB. Added
+   `GET /production-logs/config` (`ProductionLogsService.getConfig()`) returning live
+   `employees`/`machines`/`knives`/`defectTypes`; both pages now fetch it on load
+   (loading/error states included). The two hardcoded lib files are deleted.
+   `CLAUDE.md` and `MANAGER_GUIDE.md` rewritten accordingly — adding reference data is
+   a **DB insert only** now, no code/redeploy step, matching how `item_master` always
+   worked.
+6. **Added `employees.active` (boolean, default `true`)** — done by the repo owner via
+   Neon console, then `npx prisma db pull` + `npx prisma generate` to sync
+   `schema.prisma`/the generated client, then `getConfig()`'s employees query got
+   `where: { active: true }` added so inactive people (e.g. resigned รัตนา) drop out
+   of the Start/Checkout dropdowns without breaking their historical logs.
+   `database/001_init_schema.sql`'s `employees` table definition updated to match.
+   **No equivalent flag exists yet for `machines`/`knives`/`defect_types`** — same
+   gap, not yet needed, documented in `MANAGER_GUIDE.md` §1.
+7. **Debugged a stale-process bug** (Claude's own mistake): an orphaned
+   `node dist/src/main` process survived a `pkill -f "nest start"` from earlier
+   testing and squatted on port 3001 for ~50 minutes, serving pre-`active`-column code
+   no matter how many times the repo owner restarted their own dev server. Killed via
+   `taskkill //PID <pid> //F` once found via `netstat`/`Get-CimInstance Win32_Process`.
+   Worth checking `netstat -ano | grep :3001` if the backend ever seems to be ignoring
+   changes despite a clean restart.
+
+**Next up (told to Claude, not yet started):** a second dashboard focused on
+numbers/analytics (aggregate stats, not the existing live in-progress list).
+
+---
+
 ## What was done this session (2026-07-17 → 18)
 
 1. Created `CLAUDE.md`, initialized a single git repo, pushed to GitHub.
@@ -87,7 +159,13 @@ Stack: **NestJS + Prisma** backend, **Next.js (App Router)** frontend, **Neon Po
 
 ## Suggested next steps (not yet done)
 
-- [ ] **Commit + push** the 9 local changes (see top of file). Highest priority.
+- [ ] **In progress / up next**: a second dashboard focused on aggregate numbers
+      (production totals, defect-rate trends, stock burn, etc.) — distinct from the
+      existing `/dashboard`, which only lists currently-`in_progress` work orders live.
+      No design or data-source decisions made yet as of this note.
+- [ ] **Commit** the 2026-07-30 work (see "READ THIS FIRST") once the repo owner is
+      ready — check with them on how they want it split/messaged, they've been hands-on
+      with review all session.
 - [ ] Migrate `frontend/app/checkout/page.tsx` from its hand-rolled inline-style theme
       (the `V`/`S` objects) onto the Tailwind Shift Log tokens the other pages now use.
       It works and uses the same colors, but it's the last screen not on the shared system.
@@ -96,8 +174,10 @@ Stack: **NestJS + Prisma** backend, **Next.js (App Router)** frontend, **Neon Po
       so `npm run deploy` works, or keep deploying via the CLI command below. Also decide
       whether GitHub-push-auto-deploy should be the source of truth (if so, always push
       before relying on it).
-- [ ] Optional: reseed script is ad-hoc; consider adding a committed `database/003_*.sql`
-      if sample data needs to be restorable repeatably.
+- [ ] Consider adding an `active` boolean to `machines`/`knives`/`defect_types` too,
+      matching what `employees`/`item_master` now have — same "resigned employee still
+      in the dropdown" class of problem will eventually hit a retired machine or
+      discontinued knife size.
 
 ---
 

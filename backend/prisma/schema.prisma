@@ -33,11 +33,12 @@ model employees {
   id                                                       Int               @id @default(autoincrement())
   name                                                     String            @db.VarChar(100)
   role                                                     String            @db.VarChar(20)
+  active                                                   Boolean           @default(true)
   machine_owners                                           machine_owners[]
   production_logs_production_logs_operator_idToemployees   production_logs[] @relation("production_logs_operator_idToemployees")
   production_logs_production_logs_supervisor_idToemployees production_logs[] @relation("production_logs_supervisor_idToemployees")
-  withdrawal_log                                           withdrawal_log[]
   receipt_log                                              receipt_log[]
+  withdrawal_log                                           withdrawal_log[]
 }
 
 model knives {
@@ -97,12 +98,6 @@ model stone_changes {
   production_logs   production_logs @relation(fields: [production_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
 }
 
-model stone_stock {
-  id            Int    @id @default(autoincrement())
-  size          String @db.VarChar(20)
-  qty_available Int
-}
-
 model tune_rounds {
   id                Int             @id @default(autoincrement())
   production_log_id Int
@@ -114,18 +109,15 @@ model tune_rounds {
   @@unique([production_log_id, round_no])
 }
 
-// ===== Inventory phase (เบิก-รับเข้าวัสดุสิ้นเปลือง) =====
-// สต็อคคำนวณสดผ่าน view `inventory_state` — ไม่มี model ที่นี่ (query ด้วย $queryRaw)
-
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model item_master {
   id             String           @id @db.VarChar(30)
   name           String           @db.VarChar(120)
   unit           String           @db.VarChar(20)
-  reorder_point  Int
+  reorder_point  Int              @default(0)
   active         Boolean          @default(true)
-  withdrawal_log withdrawal_log[]
   receipt_log    receipt_log[]
+  withdrawal_log withdrawal_log[]
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -140,8 +132,10 @@ model withdrawal_log {
   reason        String?
   remark        String?
   item_master   item_master @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  employees     employees   @relation(fields: [withdrawer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   machines      machines?   @relation(fields: [machine_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees     employees   @relation(fields: [withdrawer_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([item_id], map: "idx_withdrawal_item")
 }
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
@@ -155,4 +149,6 @@ model receipt_log {
   remark      String?
   item_master item_master @relation(fields: [item_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   employees   employees   @relation(fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([item_id], map: "idx_receipt_item")
 }

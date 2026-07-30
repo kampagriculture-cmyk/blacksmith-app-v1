@@ -7,9 +7,8 @@ import {
   type InProgressLog,
   type DefectEntry,
   type TuneRoundPayload,
+  type ProductionLogConfig,
 } from "@/lib/api";
-import { DEFECT_TYPES } from "@/lib/defect-types";
-import { EMPLOYEES } from "@/lib/employees";
 import { BackLink } from "@/components/BackLink";
 
 // ===== คำนวณ downtime — ยกตรรกะจากฟอร์มเดิม (ข้ามเที่ยงคืน +1440) =====
@@ -145,6 +144,17 @@ const [qcApproved, setQcApproved] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
+  const [config, setConfig] = useState<ProductionLogConfig | null>(null);
+  const [configErr, setConfigErr] = useState<string | null>(null);
+
+  // ★ ดึงรายชื่อประเภทของเสีย/พนักงานสดจาก backend แทนของ hardcode เดิม
+  useEffect(() => {
+    api
+      .getProductionLogConfig()
+      .then(setConfig)
+      .catch((e) => setConfigErr((e as ApiError).message));
+  }, []);
+
   // ===== ยอดรวม — คำนวณสดเหมือนฟอร์มเดิม =====
   const totalNum = parseInt(totalQty) || 0;
   const ngSum = Object.values(defectQty).reduce((s, q) => s + (q || 0), 0);
@@ -262,6 +272,32 @@ const [qcApproved, setQcApproved] = useState<boolean | null>(null);
     }
   }
 
+  if (configErr) {
+    return (
+      <div style={S.body}>
+        <div style={S.wrap}>
+          <button onClick={onCancel} style={S.backBtn}>
+            ← กลับ
+          </button>
+          <div style={S.errBox}>{configErr}</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!config) {
+    return (
+      <div style={S.body}>
+        <div style={S.wrap}>
+          <button onClick={onCancel} style={S.backBtn}>
+            ← กลับ
+          </button>
+          <div style={{ ...S.section, textAlign: "center", color: V.text3 }}>กำลังโหลด...</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={S.body}>
       <div style={S.wrap}>
@@ -372,10 +408,10 @@ const [qcApproved, setQcApproved] = useState<boolean | null>(null);
             <span style={S.ic}>▦</span> ประเภทของเสีย <span style={S.opt}>— ไม่บังคับ</span>
           </div>
           <div style={{ display: "grid", gap: 10 }}>
-            {DEFECT_TYPES.map((d, i) => (
+            {config.defectTypes.map((d, i) => (
               <div key={d.code}>
                 <label style={S.defectLabel}>
-                  {d.code} {d.name}
+                  {d.code} {d.name_th}
                 </label>
                 <div style={{ display: "flex" }}>
                   <span style={S.stepTag}>H{i + 1}</span>
@@ -502,9 +538,9 @@ const [qcApproved, setQcApproved] = useState<boolean | null>(null);
                 style={S.input}
               >
                 <option value="">เลือก...</option>
-                {EMPLOYEES.map((e) => (
+                {config.employees.map((e) => (
                   <option key={e.id} value={e.id}>
-                    {e.label}
+                    {e.name}
                   </option>
                 ))}
               </select>

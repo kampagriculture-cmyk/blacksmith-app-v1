@@ -13,6 +13,23 @@ function timeStringToDate(time: string): Date {
   return new Date(`1970-01-01T${time}:00Z`);
 }
 
+/** "HH:MM" จาก DB Time field (เก็บแบบ UTC ตาม timeStringToDate ด้านบน) */
+function timeToHHMM(t: Date): string {
+  return `${String(t.getUTCHours()).padStart(2, "0")}:${String(t.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/** นาทีต่างระหว่าง HH:MM สองค่า ข้ามเที่ยงคืน +1440 (ตรรกะเดียวกับ calcDt เดิมฝั่ง Apps Script) */
+function minutesBetween(start: Date, end: Date): number {
+  const s = start.getUTCHours() * 60 + start.getUTCMinutes();
+  const e = end.getUTCHours() * 60 + end.getUTCMinutes();
+  return e < s ? e - s + 1440 : e - s;
+}
+
+const H_CODES = [
+  "H01", "H02", "H03", "H04", "H05", "H06", "H07",
+  "H08", "H09", "H10", "H11", "H12", "H13", "H14", "H15",
+];
+
 const LOCK_NAMESPACE_MACHINE = 42;
 
 type ProductionLogLockRow = {
@@ -240,6 +257,97 @@ export class ProductionLogsService {
 
       return log;
     });
+  }
+
+  /** ข้อมูลอ้างอิงสำหรับ dropdown ฝั่ง frontend (start/checkout) — ดึงสดจาก DB แทน hardcode */
+  async getConfig() {
+    const [employees, machines, knives, defectTypes] = await Promise.all([
+      this.prisma.employees.findMany({
+        where: { active: true },        // ← เพิ่มบรรทัดนี้
+        select: { id: true, name: true, role: true },
+        orderBy: { id: "asc" },
+      }),
+      this.prisma.machines.findMany({
+        select: { id: true, code: true },
+        orderBy: { id: "asc" },
+      }),
+      this.prisma.knives.findMany({
+        select: { id: true, code: true },
+        orderBy: { id: "asc" },
+      }),
+      this.prisma.defect_types.findMany({
+        select: { code: true, name_th: true, display_order: true },
+        orderBy: { display_order: "asc" },
+      }),
+    ]);
+    return { employees, machines, knives, defectTypes };
+  }
+
+  /**
+   * ข้อมูลดิบทั้งหมดสำหรับหน้า Analytics — ports the old Google Apps Script
+   * dashboard's getDashboardData(). ฝั่ง frontend ทำ filter/aggregate เองหมด
+   * (เหมือนต้นฉบับ) เลยส่งทุกแถวไปแบบไม่กรอง ไม่ทำ pagination
+   */
+  async getAnalyticsData() {
+    const logs = await this.prisma.production_logs.findMany({
+      where: { status: "completed" },
+      include: {
+        machines: true,
+        knives: true,
+        employees_production_logs_operator_idToemployees: true,
+        employees_production_logs_supervisor_idToemployees: true,
+        defect_entries: true,
+        stone_changes: true,
+        tune_rounds: true,
+      },
+      orderBy: { ended_at: "asc" },
+    });
+
+    return logs.map((log) => {
+      const totalQty = log.total_qty ?? 0;
+      const defects: Record<string, number> = Object.fromEntries(H_CODES.map((c) => [c, 0]));
+      let ngQty = 0;
+      for (const d of log.defect_entries) {
+        defects[d.defect_type_code] = d.qty;
+        ngQty += d.qty;
+      }
+
+      const tuneMinutesTotal = log.tune_rounds.reduce(
+        (sum, r) => sum + minutesBetween(r.start_time, r.end_time),
+        0,
+      );
+
+      return {
+        id: log.id,
+        machineCode: log.machines.code,
+        knifeCode: log.knives.code,
+        lotNo: log.lot_no,
+        endedAt: log.ended_at,
+        totalQty,
+        ngQty,
+        goodQty: totalQty - ngQty,
+        defects,
+        stoneChanged: log.stone_changes !== null,
+        qtyBeforeChange: log.stone_changes?.qty_before_change ?? null,
+        stoneDowntimeStart: log.stone_changes?.downtime_start
+          ? timeToHHMM(log.stone_changes.downtime_start)
+          : null,
+        stoneDowntimeEnd: log.stone_changes?.downtime_end
+          ? timeToHHMM(log.stone_changes.downtime_end)
+          : null,
+        tuneMinutesTotal,
+        operatorName: log.employees_production_logs_operator_idToemployees.name,
+        supervisorName: log.employees_production_logs_supervisor_idToemployees?.name ?? null,
+      };
+    });
+  }
+
+  /** เจ้าของเครื่อง (ports getMachineOwners) — map: machine code -> ชื่อคนประจำเครื่อง */
+  async getMachineOwners() {
+    const rows = await this.prisma.machine_owners.findMany({
+      include: { machines: true, employees: true },
+    });
+    return Object.fromEntries(rows.map((r) => [r.machines.code, r.employees.name]));
   }
 
   async findByMachine(machineCode: string) {

@@ -47,7 +47,34 @@
       "Bash(curl -s -m 10 -o /dev/null -w \"%{http_code}\\\\n\" https://blacksmith-v1.vercel.app/production-logs/in-progress)",
       "Bash(curl -s -m 10 https://blacksmith-app-v1.vercel.app/)",
       "Bash(curl -s -m 10 -o /dev/null -w \"%{http_code}\\\\n\" https://blacksmith-app-v1.vercel.app/production-logs/in-progress)",
-      "Bash(git fetch *)"
+      "Bash(git fetch *)",
+      "Bash(mkdir -p /c/Dev/MyProductionSystem/database/source-data && mkdir -p /c/Dev/MyProductionSystem/backend/scripts *)",
+      "Bash(grep -v \"SECURITY WARNING\\\\|next major version\\\\|explicitly use\\\\|libpq compat\\\\|postgresql.org\\\\|trace-warnings\\\\|^$\")",
+      "Bash(node decode2.js)",
+      "Bash(cp \"/c/Users/kampa/AppData/Local/Temp/claude/c--Dev-MyProductionSystem/5248a020-f7a0-470d-bb7d-bda87f9f8eb6/scratchpad/sg01_database_v2.csv\" /c/Dev/MyProductionSystem/database/source-data/sg01_production_log.csv *)",
+      "Bash(grep -v \"SECURITY WARNING\\\\|next major version\\\\|explicitly use\\\\|libpq compat\\\\|postgresql.org\\\\|trace-warnings\\\\|^$\\\\|To prepare\")",
+      "mcp__claude_ai_Google_Drive__get_file_metadata",
+      "Bash(node decode3.js)",
+      "Bash(node diff-v2-v3.js)",
+      "Bash(cp \"/c/Users/kampa/AppData/Local/Temp/claude/c--Dev-MyProductionSystem/5248a020-f7a0-470d-bb7d-bda87f9f8eb6/scratchpad/sg01_database_v3.csv\" /c/Dev/MyProductionSystem/database/source-data/sg01_production_log.csv)",
+      "Bash(mkdir -p \"C:\\\\Users\\\\kampa\\\\.claude\\\\projects\\\\c--Dev-MyProductionSystem\\\\memory\")",
+      "Bash(xxd)",
+      "Bash(echo \"exit code: $?\")",
+      "Bash(echo \"exit: $?\")",
+      "Bash(pkill -f \"nest start\")",
+      "Bash(curl -s http://localhost:3001/production-logs/config)",
+      "Bash(echo \"---curl exit: $?---\")",
+      "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
+      "Bash(wmic process *)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=18840\")",
+      "Bash(taskkill //PID 18840 //F)",
+      "Bash(grep -n '\\\\$\\(\"typePick\"\\)' app/analytics/page.tsx)",
+      "Bash(taskkill //PID 25476 //F)",
+      "Bash(git check-ignore *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\kampa\\AppData\\Local\\Temp\\claude\\c--Dev-MyProductionSystem\\5248a020-f7a0-470d-bb7d-bda87f9f8eb6\\scratchpad",
+      "C:\\Users\\kampa\\.claude\\projects\\c--Dev-MyProductionSystem"
     ]
   }
 }
