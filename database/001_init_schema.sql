@@ -53,7 +53,8 @@ CREATE TABLE production_logs (
   qc_approved BOOLEAN,
   remark TEXT,
   created_at TIMESTAMP NOT NULL DEFAULT now(),
-  updated_at TIMESTAMP NOT NULL DEFAULT now()
+  updated_at TIMESTAMP NOT NULL DEFAULT now(),
+  version INTEGER NOT NULL DEFAULT 1
 );
 
 -- Only one open ("in_progress") work order allowed per machine at a time.
@@ -95,6 +96,44 @@ CREATE TABLE defect_entries (
   qty INTEGER NOT NULL CHECK (qty > 0),
   UNIQUE(production_log_id, defect_type_code)
 );
+
+-- ---------- 3b. Audit trail (snapshot-before-update) ----------
+-- ก่อน UPDATE ค่าใหม่ลง production_logs ต้องบันทึก snapshot ของ row เดิมทั้งก้อน
+-- ลงตารางนี้ก่อนเสมอ (ทั้งสอง operation อยู่ใน transaction เดียวกัน) — ดู
+-- AUDIT_TRAIL_PLAN.md สำหรับรายละเอียด service-layer logic
+
+CREATE TABLE production_log_history (
+  id                 SERIAL PRIMARY KEY,
+  production_log_id  INTEGER NOT NULL
+    REFERENCES production_logs(id) ON DELETE CASCADE,
+  snapshot           JSONB NOT NULL,          -- ค่าทั้ง row ก่อนถูกแก้
+  version            INTEGER NOT NULL,        -- version ณ ตอนที่ snapshot นี้เป็นตัวแทน
+  edited_by          VARCHAR(100) NOT NULL,   -- ชื่อคนแก้ (ยังไม่มี auth → ส่งมาจาก client)
+  edit_reason        TEXT,
+  edited_at          TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_history_log_id ON production_log_history(production_log_id);
+CREATE INDEX idx_history_edited_at ON production_log_history(edited_at);
+
+-- ---------- 3c. Hard-delete support (snapshot-before-delete) ----------
+-- ไม่ FK ไปหา production_logs (row จะไม่มีอยู่แล้วหลังลบ) — ต่างจาก
+-- production_log_history ที่ FK ON DELETE CASCADE ได้ เพราะที่นี่การลบ "คือ"
+-- เหตุการณ์ที่กำลังบันทึก ถ้า FK cascade มันจะลบ snapshot ที่เพิ่ง insert ไปเอง
+-- snapshot เก็บทั้ง row หลัก + child records (defect_entries, stone_changes,
+-- tune_rounds) + ประวัติแก้ไขเดิม (ถ้ามี) เพราะทั้งหมดจะหายไปตอนลบจริง
+
+CREATE TABLE production_log_deletions (
+  id                 SERIAL PRIMARY KEY,
+  production_log_id  INTEGER NOT NULL,
+  snapshot           JSONB NOT NULL,
+  deleted_by         VARCHAR(100) NOT NULL,
+  delete_reason      TEXT,
+  deleted_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_deletions_log_id ON production_log_deletions(production_log_id);
+CREATE INDEX idx_deletions_deleted_at ON production_log_deletions(deleted_at);
 
 -- ---------- 4. View ช่วยคำนวณ good_qty ----------
 -- ไม่เก็บ good_qty ซ้ำใน production_logs

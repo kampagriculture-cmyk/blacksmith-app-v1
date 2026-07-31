@@ -64,25 +64,27 @@ model machines {
 
 /// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
 model production_logs {
-  id                                                 Int              @id @default(autoincrement())
-  machine_id                                         Int              @unique(map: "one_in_progress_per_machine", where: raw("((status)::text = 'in_progress'::text)"))
+  id                                                 Int                      @id @default(autoincrement())
+  machine_id                                         Int                      @unique(map: "one_in_progress_per_machine", where: raw("((status)::text = 'in_progress'::text)"))
   knife_id                                           Int
-  lot_no                                             String           @db.VarChar(50)
-  status                                             String           @default("completed") @db.VarChar(20)
-  ended_at                                           DateTime?        @db.Timestamp(6)
+  lot_no                                             String                   @db.VarChar(50)
+  status                                             String                   @default("completed") @db.VarChar(20)
+  ended_at                                           DateTime?                @db.Timestamp(6)
   total_qty                                          Int?
   operator_id                                        Int
   supervisor_id                                      Int?
   qc_approved                                        Boolean?
   remark                                             String?
-  created_at                                         DateTime         @default(now()) @db.Timestamp(6)
-  updated_at                                         DateTime         @default(now()) @db.Timestamp(6)
-  started_at                                         DateTime?        @db.Timestamp(6)
+  created_at                                         DateTime                 @default(now()) @db.Timestamp(6)
+  updated_at                                         DateTime                 @default(now()) @db.Timestamp(6)
+  started_at                                         DateTime?                @db.Timestamp(6)
+  version                                            Int                      @default(1)
   defect_entries                                     defect_entries[]
-  knives                                             knives           @relation(fields: [knife_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  machines                                           machines         @relation(fields: [machine_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  employees_production_logs_operator_idToemployees   employees        @relation("production_logs_operator_idToemployees", fields: [operator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  employees_production_logs_supervisor_idToemployees employees?       @relation("production_logs_supervisor_idToemployees", fields: [supervisor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  production_log_history                             production_log_history[]
+  knives                                             knives                   @relation(fields: [knife_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  machines                                           machines                 @relation(fields: [machine_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees_production_logs_operator_idToemployees   employees                @relation("production_logs_operator_idToemployees", fields: [operator_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  employees_production_logs_supervisor_idToemployees employees?               @relation("production_logs_supervisor_idToemployees", fields: [supervisor_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   stone_changes                                      stone_changes?
   tune_rounds                                        tune_rounds[]
 }
@@ -151,4 +153,30 @@ model receipt_log {
   employees   employees   @relation(fields: [receiver_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([item_id], map: "idx_receipt_item")
+}
+
+model production_log_history {
+  id                Int             @id @default(autoincrement())
+  production_log_id Int
+  snapshot          Json
+  version           Int
+  edited_by         String          @db.VarChar(100)
+  edit_reason       String?
+  edited_at         DateTime        @default(now()) @db.Timestamptz(6)
+  production_logs   production_logs @relation(fields: [production_log_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([edited_at], map: "idx_history_edited_at")
+  @@index([production_log_id], map: "idx_history_log_id")
+}
+
+model production_log_deletions {
+  id                Int      @id @default(autoincrement())
+  production_log_id Int
+  snapshot          Json
+  deleted_by        String   @db.VarChar(100)
+  delete_reason     String?
+  deleted_at        DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([deleted_at], map: "idx_deletions_deleted_at")
+  @@index([production_log_id], map: "idx_deletions_log_id")
 }

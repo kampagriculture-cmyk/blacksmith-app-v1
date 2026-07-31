@@ -6,6 +6,7 @@ const LINKS = [
   { href: "/dashboard", label: "แดชบอร์ด", desc: "ดูงานที่กำลังดำเนินอยู่" },
   { href: "/inventory", label: "เบิก-รับเข้าวัสดุ", desc: "เบิก/รับเข้าวัสดุสิ้นเปลืองและดูสต็อค" },
   { href: "/analytics", label: "วิเคราะห์ผลการผลิต", desc: "แนวโน้ม ของเสีย อายุหิน เปรียบเทียบ A/B" },
+  { href: "/records", label: "ประวัติบันทึกการผลิต", desc: "ดูย้อนหลังทีละล็อต แก้ไขข้อมูลที่บันทึกผิดได้" },
 ];
 
 export default function Home() {

@@ -107,6 +107,107 @@ export type AnalyticsRow = {
 
 export type MachineOwners = Record<string, string>;
 
+// ---------- Records ("ประวัติบันทึกการผลิต") + edit / audit trail ----------
+
+export type RecordStoneChange = {
+  qtyBeforeChange: number;
+  sizeLeft: string | null;
+  sizeRight: string | null;
+  downtimeStart: string | null; // "HH:MM"
+  downtimeEnd: string | null;   // "HH:MM"
+};
+
+export type RecordTuneRound = {
+  roundNo: number;
+  startTime: string; // "HH:MM"
+  endTime: string;   // "HH:MM"
+};
+
+export type RecordRow = {
+  id: number;
+  lot_no: string;
+  machine: { id: number; code: string };
+  operator: { id: number; name: string };
+  supervisor: { id: number; name: string } | null;
+  knife: { id: number; code: string };
+  total_qty: number;
+  good_qty: number;
+  defect_qty: number;
+  status: string;
+  started_at: string | null;
+  ended_at: string | null;
+  version: number;
+  qc_approved: boolean | null;
+  remark: string | null;
+  stone_change: RecordStoneChange | null;
+  tune_rounds: RecordTuneRound[];
+};
+
+export type RecordsResponse = {
+  data: RecordRow[];
+  pagination: { page: number; limit: number; total: number; total_pages: number };
+};
+
+export type RecordsQuery = {
+  page?: number;
+  limit?: number;
+  machineId?: number;
+  operatorId?: number;
+  dateFrom?: string;
+  dateTo?: string;
+};
+
+export type UpdateLogPayload = {
+  machineId?: number;
+  knifeId?: number;
+  lotNo?: string;
+  status?: "in_progress" | "completed";
+  startedAt?: string;
+  endedAt?: string;
+  totalQty?: number;
+  operatorId?: number;
+  supervisorId?: number;
+  qcApproved?: boolean;
+  remark?: string;
+  // undefined = ไม่แตะ, null = ลบการเปลี่ยนหินออก, object = upsert
+  stoneChange?: { qtyBeforeChange: number; sizeLeft?: string; sizeRight?: string; downtimeStart?: string; downtimeEnd?: string } | null;
+  // undefined = ไม่แตะ, array (รวม []) = แทนที่รอบจูนทั้งชุด
+  tuneRounds?: { roundNo: number; startTime: string; endTime: string }[];
+  editedBy: string;
+  editReason?: string;
+};
+
+// ★ ค่าที่ backend ส่งกลับจาก PATCH คือ production_logs row ดิบ (ไม่มี relations
+// ผูกมาด้วย) ต่างจาก RecordRow ที่มี machine/operator/knife เป็น object ซ้อน —
+// หลัง edit สำเร็จให้ refetch รายการแทนที่จะพยายามแปลง shape นี้เอง
+export type UpdateLogResponse = {
+  id: number;
+  machine_id: number;
+  knife_id: number;
+  lot_no: string;
+  status: string;
+  total_qty: number | null;
+  operator_id: number;
+  supervisor_id: number | null;
+  version: number;
+};
+
+export type LogHistoryEntry = {
+  id: number;
+  production_log_id: number;
+  snapshot: Record<string, unknown>;
+  version: number;
+  edited_by: string;
+  edit_reason: string | null;
+  edited_at: string;
+};
+
+export type LogHistoryResponse = {
+  current_version: number;
+  total_edits: number;
+  history: LogHistoryEntry[];
+};
+
 export type LotCheckResult = {
   done: boolean;
   log: {
@@ -196,6 +297,32 @@ export const api = {
   getAnalyticsData: () => request<AnalyticsRow[]>("/production-logs/analytics"),
 
   getMachineOwners: () => request<MachineOwners>("/production-logs/machine-owners"),
+
+  getRecords: (query: RecordsQuery = {}) => {
+    const params = new URLSearchParams();
+    if (query.page) params.set("page", String(query.page));
+    if (query.limit) params.set("limit", String(query.limit));
+    if (query.machineId) params.set("machineId", String(query.machineId));
+    if (query.operatorId) params.set("operatorId", String(query.operatorId));
+    if (query.dateFrom) params.set("dateFrom", query.dateFrom);
+    if (query.dateTo) params.set("dateTo", query.dateTo);
+    const qs = params.toString();
+    return request<RecordsResponse>(`/production-logs/records${qs ? `?${qs}` : ""}`);
+  },
+
+  updateLog: (id: number, body: UpdateLogPayload) =>
+    request<UpdateLogResponse>(`/production-logs/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    }),
+
+  getLogHistory: (id: number) => request<LogHistoryResponse>(`/production-logs/${id}/history`),
+
+  deleteLog: (id: number, body: { deletedBy: string; deleteReason?: string }) =>
+    request<{ deleted: true; id: number }>(`/production-logs/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify(body),
+    }),
 
   // ----- inventory -----
   getItems: () => request<InventoryItem[]>("/inventory/items"),

@@ -167,7 +167,55 @@ than looking for a stale frontend file (there isn't one anymore).
 
 ---
 
-## 9. Safety notes
+## 9. ประวัติบันทึกการผลิต — viewing and correcting past work orders
+
+The **ประวัติบันทึกการผลิต** screen (`/records`, linked from the home page) lists every
+completed work order, newest first, one row per lot. Filter by machine, operator, or
+date range at the top; the list pages 20 at a time.
+
+**This screen is for looking back and fixing mistakes — not for recording work.** Normal
+recording still happens automatically when an operator checks out a job.
+
+### Correcting a log
+
+If a work order was checked out with a mistake (e.g. the total quantity was miscounted),
+click its row to open the edit box. You can correct:
+
+- **จำนวนทั้งหมด** (total quantity)
+- **พนักงาน** (operator)
+- **หัวหน้างาน** (supervisor)
+
+Machine, knife, lot number, and dates are shown but locked — if those are wrong, it's the
+*wrong record*, not a wrong value, so it needs a developer rather than an edit.
+
+Two fields are required before the save button turns on:
+
+- **แก้ไขโดย** — who is making this correction (pick your own name)
+- **เหตุผล** — why, in plain words (e.g. "นับยอดผิดตอน checkout")
+
+**Nothing is ever overwritten or deleted.** Every correction keeps a full snapshot of the
+old values along with who changed it and why. A row that's been corrected shows an amber
+**"แก้ไขแล้ว ×N"** badge in the list so it's obvious at a glance, and the edit box shows
+the current version number.
+
+The total quantity can't be set below the defect count already recorded for that lot —
+the box will block it and tell you why.
+
+### Reading the history directly
+
+The screen doesn't show the full past-values timeline yet (that's a later phase). To read
+it now, either use `GET /production-logs/<id>/history`, or query the database:
+
+```sql
+SELECT * FROM production_log_history WHERE production_log_id = <id> ORDER BY version DESC;
+```
+
+`production_logs.version` tells you how many times a log has been corrected (starts at 1,
++1 per edit).
+
+---
+
+## 10. Safety notes
 
 - Never `DELETE` a row from `employees`, `machines`, `knives`, or `item_master` that
   has any history attached (foreign keys will usually stop you anyway) — for

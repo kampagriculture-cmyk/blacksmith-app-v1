@@ -7,21 +7,25 @@
 
 ---
 
-## ⚠️ READ THIS FIRST — a lot is uncommitted, and Neon now has real historical data
+## ⚠️ READ THIS FIRST — audit trail is uncommitted, and Neon now has real historical data
 
-**Nothing from the 2026-07-30 session is committed yet.** `git status` currently shows:
+**Items 1–10 of the 2026-07-30 session are committed (`901ecf4`) and deployed to Vercel.**
+**Item 11 (audit trail + `/records`) is written and verified locally but NOT committed and
+NOT deployed** — though **its schema change is already live on Neon** (`version` column +
+`production_log_history` table), so production DB is ahead of production code. That's safe
+in this direction (the new column has a default, nothing reads the new table yet), but
+don't leave it half-way for long. `git status` currently shows:
 ```
-M  .claude/settings.json, CLAUDE.md, backend/prisma/schema.prisma,
-   backend/src/production-logs/production-logs.{controller,service}.ts,
-   database/001_init_schema.sql, frontend/app/{checkout,start}/page.tsx,
-   frontend/lib/api.ts
-D  frontend/lib/defect-types.ts, frontend/lib/employees.ts
-?? CONCURRENCY.md, MANAGER_GUIDE.md, backend/scripts/, database/004_reset_reference_data.sql,
-   database/source-data/
+M  .claude/settings.json, CLAUDE.md, HANDOFF.md, MANAGER_GUIDE.md,
+   backend/prisma/schema.prisma, backend/src/production-logs/production-logs.{controller,service}.ts,
+   database/001_init_schema.sql, frontend/app/page.tsx, frontend/lib/api.ts
+?? AUDIT_TRAIL_PLAN.md, AUDIT_TRAIL_AND_HISTORY_PAGE_PLAN.md,
+   backend/src/production-logs/dto/{records-query,update-production-log}.dto.ts,
+   backend/test-edit.ps1, backend/test-concurrent-edit.js,
+   database/005_audit_trail_schema.sql, frontend/app/records/
 ```
-This is all one coherent piece of work (see "What was done" below) — commit it as such
-when the manager (repo owner) is ready; don't split it up without checking with them
-first, they've been deliberately hands-on with review this session.
+Don't split this up without checking with the repo owner first — they've been deliberately
+hands-on with review, and they run all DB-writing and deploy commands themselves.
 
 **More important than the git state: production Neon now holds real historical data.**
 691+ real production-log rows were migrated from the shop's old Google Sheets
@@ -126,8 +130,45 @@ Stack: **NestJS + Prisma** backend, **Next.js (App Router)** frontend, **Neon Po
    Worth checking `netstat -ano | grep :3001` if the backend ever seems to be ignoring
    changes despite a clean restart.
 
-**Next up (told to Claude, not yet started):** a second dashboard focused on
-numbers/analytics (aggregate stats, not the existing live in-progress list).
+8. **Built the analytics dashboard** (`/analytics`) — ported wholesale from the shop's
+   old Google Apps Script dashboard (the owner pasted its HTML/JS in chat). KPIs, A/B
+   compare mode, Pareto defect chart, stone-lifespan chart, daily-trend chart with
+   user-defined comparison series, and a daily table flagging stone changes / operator
+   swaps / unassigned machines. Backed by two new endpoints: `GET /production-logs/analytics`
+   (every completed row, unfiltered — the page aggregates client-side exactly like the
+   original did) and `GET /production-logs/machine-owners`. Only the data-fetch layer
+   changed (`google.script.run` → `fetch`) plus column-index magic numbers → named fields.
+   Added `chart.js` as a real dependency (the original used a CDN `<script>`).
+9. **Committed + deployed everything above** — commit `901ecf4`, pushed to GitHub, then
+   deployed both Vercel projects. Verified live: `/production-logs/config` correctly
+   excludes inactive รัตนา, `/production-logs/analytics` returns all 695 rows,
+   `/analytics` page renders.
+10. **Fixed a real downtime bug found during review**, then extended the feature: the
+    owner questioned a "3h28m" July SG-01 downtime figure. Investigation showed the
+    formula (`stone-change time + tuning time`) was right but `tune_rounds` was **empty
+    for all 695 rows** — the original migration had folded tuning info into `remark` as
+    free text. Of 148 rows with `"จูน:"` in remark, only 10 held a real parseable time
+    range (the other 138 were literally `"จูน:  (0 นาที)"`); `backend/scripts/backfill-tune-rounds.ts`
+    recovered those 10 (idempotent, validates stated-vs-computed minutes before writing).
+    Also split the Downtime KPI to show **เปลี่ยนหิน% vs จูน%** of total downtime.
+11. **Audit trail + `/records` page** (per `AUDIT_TRAIL_PLAN.md`, then the expanded
+    `AUDIT_TRAIL_AND_HISTORY_PAGE_PLAN.md`):
+    - Schema: `production_logs.version` + `production_log_history` (JSONB snapshot,
+      `edited_by`, `edit_reason`) — `database/005_audit_trail_schema.sql`, run on Neon by
+      the owner, mirrored into `001_init_schema.sql`.
+    - `PATCH /production-logs/:id` — snapshot-then-update inside one transaction, using
+      the same `FOR UPDATE` row lock as `checkoutWorkOrder`. `GET /production-logs/:id/history`
+      returns the trail. Test scripts: `backend/test-edit.ps1`, `backend/test-concurrent-edit.js`
+      (⚠ the concurrent one mutates whatever `LOG_ID` is set at the top — pick a throwaway log).
+    - `GET /production-logs/records` — paginated + server-filtered list (deliberately
+      separate from `/analytics`, which is unfiltered-everything for client-side math).
+    - `frontend/app/records/page.tsx` — the browse-and-correct table + edit modal, on
+      Tailwind/DESIGN.md tokens. Amber "แก้ไขแล้ว ×N" badge on corrected rows.
+    - Decided during build: the "แก้ไขโดย" dropdown lists **all roles**, not just
+      supervisors — there's no auth, so restricting it would be theater, not a control.
+
+**Not yet done for the audit-trail feature:** the owner hasn't run `test-edit.ps1` /
+`test-concurrent-edit.js` yet, and none of item 11 is committed or deployed.
 
 ---
 
@@ -159,13 +200,12 @@ numbers/analytics (aggregate stats, not the existing live in-progress list).
 
 ## Suggested next steps (not yet done)
 
-- [ ] **In progress / up next**: a second dashboard focused on aggregate numbers
-      (production totals, defect-rate trends, stock burn, etc.) — distinct from the
-      existing `/dashboard`, which only lists currently-`in_progress` work orders live.
-      No design or data-source decisions made yet as of this note.
-- [ ] **Commit** the 2026-07-30 work (see "READ THIS FIRST") once the repo owner is
-      ready — check with them on how they want it split/messaged, they've been hands-on
-      with review all session.
+- [ ] **Immediate**: run `backend/test-edit.ps1` and `backend/test-concurrent-edit.js`
+      against the audit-trail endpoints, review `/records` in the browser, then commit +
+      deploy item 11 (backend first, then frontend). Nothing from item 11 is committed yet.
+- [ ] Show the full edit-history timeline in the `/records` modal (who changed what, from
+      what value to what) — the data is all in `production_log_history`, the UI just shows
+      a version count today. Deliberately deferred in the plan as "phase ถัดไป".
 - [ ] Migrate `frontend/app/checkout/page.tsx` from its hand-rolled inline-style theme
       (the `V`/`S` objects) onto the Tailwind Shift Log tokens the other pages now use.
       It works and uses the same colors, but it's the last screen not on the shared system.
